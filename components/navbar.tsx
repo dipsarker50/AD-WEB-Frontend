@@ -1,9 +1,9 @@
 'use client';
+
 import Link from 'next/link';
 import Image from "next/image";
 import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
     return <Navbar />;
@@ -11,21 +11,22 @@ export default function Header() {
 
 export const Navbar = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
-  const pathname = usePathname(); 
 
   useEffect(() => {
-    const token = localStorage.getItem('jwtToken');
-    console.log('Navbar - JWT Token:', token);
+    // Check if user is authenticated (check for token in localStorage)
+    const token = localStorage.getItem('token');
     setIsAuthenticated(!!token);
-    console.log('Navbar - isAuthenticated:', !!token);
     
-
-  }, [pathname]);
+    // Get cart count from localStorage or state management
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    setCartCount(cart.length);
+  }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('token');
     setIsAuthenticated(false);
     router.push('/');
   };
@@ -35,38 +36,49 @@ export const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           
-          {/* LEFT SIDE: Logo + All Products + Cart */}
-          <div className="flex items-center space-x-8">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <Image src="/favicon.ico" alt="Logo" width={32} height={32} />
-              <span className="text-xl font-bold text-gray-800">AgriMarket</span>
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+            <Image src="/favicon.ico" alt="Logo" width={32} height={32} />
+            <span className="text-xl font-bold text-gray-800">AgriMarket</span>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8">
+            {/* All Products - Always visible */}
+            <Link 
+              href="/product" 
+              className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+            >
+              All Products
             </Link>
 
-            {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center space-x-6">
-              {/* All Products - Always visible */}
+            {/* My Products - Only when authenticated */}
+            {isAuthenticated && (
               <Link 
-                href="/product" 
+                href="/my-products" 
                 className="text-gray-700 hover:text-green-600 font-medium transition-colors"
               >
-                All Products
+                My Products
               </Link>
+            )}
 
-              {/* My Products - Only when authenticated */}
-              {isAuthenticated && (
-                <Link 
-                  href="/my-products" 
-                  className="text-gray-700 hover:text-green-600 font-medium transition-colors"
-                >
-                  My Products
-                </Link>
+            {/* Cart with badge */}
+            <Link 
+              href="/cart" 
+              className="relative text-gray-700 hover:text-green-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-green-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartCount}
+                </span>
               )}
-
-            </div>
+            </Link>
           </div>
 
-          {/* RIGHT SIDE: Auth Buttons or User Menu */}
+          {/* Right Side - Auth Buttons or User Menu */}
           <div className="hidden md:flex items-center space-x-4">
             {!isAuthenticated ? (
               <>
@@ -185,7 +197,14 @@ export const Navbar = () => {
                 </Link>
               )}
 
-             
+              <Link 
+                href="/cart" 
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Cart {cartCount > 0 && `(${cartCount})`}
+              </Link>
+
               {!isAuthenticated ? (
                 <>
                   <Link 
@@ -239,5 +258,5 @@ export const Navbar = () => {
 }
 
 export const DashboardItem = () => {
-  return null;
+  return null; // No longer needed, integrated into main navbar
 }
