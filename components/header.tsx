@@ -3,7 +3,8 @@ import Link from 'next/link';
 import Image from "next/image";
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-
+import {  } from '@/lib/axios';
+import axios from 'axios';
 
 export default function Header() {
     return <Navbar />;
@@ -11,23 +12,34 @@ export default function Header() {
 
 export const Navbar = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname(); 
 
-  useEffect(() => {
-    const token = localStorage.getItem('jwtToken');
-    console.log('Navbar - JWT Token:', token);
-    setIsAuthenticated(!!token);
-    console.log('Navbar - isAuthenticated:', !!token);
+
+    useEffect(() => {
+    const agentId = localStorage.getItem('agentId');
+    setIsAuthenticated(!!agentId);
     
 
   }, [pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('jwtToken');
-    setIsAuthenticated(false);
-    router.push('/');
+
+
+
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/agent/logout`,
+        {},
+        { withCredentials: true }
+      );
+      localStorage.removeItem('agentId');
+      setIsAuthenticated(false);
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -55,12 +67,24 @@ export const Navbar = () => {
 
               {/* My Products - Only when authenticated */}
               {isAuthenticated && (
+                <>
+
                 <Link 
-                  href="/my-products" 
+                  href="/dashboard" 
                   className="text-gray-700 hover:text-green-600 font-medium transition-colors"
-                >
+                  >
+                 Dashboard
+                </Link>
+
+                <Link 
+                  href="/myproducts" 
+                  className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+                  >
                   My Products
                 </Link>
+                </>
+                
+
               )}
 
             </div>
@@ -110,7 +134,7 @@ export const Navbar = () => {
                     </div>
                   </Link>
                   <Link 
-                    href="/my-products" 
+                    href="/myproducts" 
                     className="block px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center space-x-2">
@@ -120,18 +144,7 @@ export const Navbar = () => {
                       <span>My Products</span>
                     </div>
                   </Link>
-                  <Link 
-                    href="/settings" 
-                    className="block px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span>Settings</span>
-                    </div>
-                  </Link>
+                
                   <button 
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
@@ -148,96 +161,11 @@ export const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
         </div>
 
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-gray-200">
-            <div className="space-y-2">
-              <Link 
-                href="/product" 
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                All Products
-              </Link>
-              
-              {isAuthenticated && (
-                <Link 
-                  href="/my-products" 
-                  className="block px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  My Products
-                </Link>
-              )}
-
-             
-              {!isAuthenticated ? (
-                <>
-                  <Link 
-                    href="/signin" 
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Sign In
-                  </Link>
-                  <Link 
-                    href="/register" 
-                    className="block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-center"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Register
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link 
-                    href="/profile" 
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Profile
-                  </Link>
-                  <Link 
-                    href="/settings" 
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Settings
-                  </Link>
-                  <button 
-                    onClick={() => {
-                      handleLogout();
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    Logout
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </nav>
   );
 }
 
-export const DashboardItem = () => {
-  return null;
-}
+

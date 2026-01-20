@@ -10,7 +10,7 @@ export default function VerifyEmail() {
   
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState('');
-  const [pollingCount, setPollingCount] = useState(0);
+  const [count, setCount] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -25,11 +25,6 @@ export default function VerifyEmail() {
       checkVerificationStatus();
     }, 3000);
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
   }, [email]);
 
   const checkVerificationStatus = async () => {
@@ -47,14 +42,11 @@ export default function VerifyEmail() {
           router.push('/signin');
         }, 2000);
       } else {
-        // Increment polling count
-        setPollingCount(prev => prev + 1);
+        setCount(prev => prev + 1);
       }
     } catch (err: any) {
-      console.error('Error checking verification:', err);
-      // Don't show error for failed polls, keep trying
-      // Only stop after too many attempts (optional)
-      if (pollingCount > 60) { // Stop after ~3 minutes (60 * 3 seconds)
+    
+      if (count > 60) { 
         setError('Verification timeout. Please try again later.');
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
@@ -120,7 +112,7 @@ export default function VerifyEmail() {
 
             {/* Polling Info */}
             <p className="text-xs text-gray-400">
-              Checked {pollingCount} times
+              Checked {count} times
             </p>
           </div>
         ) : (

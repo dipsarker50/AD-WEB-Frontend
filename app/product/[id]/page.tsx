@@ -1,55 +1,24 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { ProductInterface } from '@/interfaces/Product';
+import axios from 'axios';
 
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  unit: string;
-  stock: number;
-  category: string;
-  imageUrl: string;
-  rating: number;
-  reviewCount: number;
-  discount: number | null;
-  isOrganic: boolean;
-  location: string;
-  harvestDate: string | null;
-  expiryDate: string | null;
-  tags: string[];
-  minOrderQuantity: number;
-  maxOrderQuantity: number | null;
-  isAvailable: boolean;
-}
+export default async function ProductDetailsPage({ params }: { params: Promise<{ id: string }> }) {
 
-export default function ProductDetailsPage({ params }: { params: { id: string } }) {
-  // Fetch product data - replace with actual API call
-  const product: Product = {
-    id: 1,
-    name: "Fresh Organic Tomatoes",
-    description: "Premium quality organic tomatoes, freshly harvested from local farms. Rich in vitamins and perfect for salads, cooking, and sauces.",
-    price: 45,
-    unit: "kg",
-    stock: 150,
-    category: "Vegetables",
-    imageUrl: "/landingPage-1.jpg",
-    rating: 4.5,
-    reviewCount: 128,
-    discount: 25,
-    isOrganic: true,
-    location: "Dhaka, Bangladesh",
-    harvestDate: "2026-01-01",
-    expiryDate: "2026-01-10",
-    tags: ["fresh", "organic", "local", "seasonal"],
-    minOrderQuantity: 1,
-    maxOrderQuantity: 50,
-    isAvailable: true
+  const Product =async ()=>{
+    var response = await axios.get(process.env.NEXT_PUBLIC_API_URL+`/product/productbyid/${(await params).id}`);
+    return response.data;
   };
 
-  const finalPrice = product.discount 
-    ? product.price - (product.price * product.discount / 100)
+  const product:ProductInterface = await Product();
+
+  if(product.discount == undefined){
+    product.discount = 0;
+  }
+  const finalPrice: number  = product.discount
+    ? product.price * (1 - product.discount / 100)
     : product.price;
+
 
   return (
     <div className="min-h-screen bg-stone-100 py-8">
@@ -61,7 +30,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
           <div className="space-y-4">
             <div className="relative aspect-square rounded-xl overflow-hidden bg-white">
               <Image
-                src={product.imageUrl}
+                src={(process.env.NEXT_PUBLIC_API_URL+"/product/getproductimage/" + (await params).id)}
                 alt={product.name}
                 fill
                 className="object-cover"
@@ -110,6 +79,10 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
               <div className="text-sm text-stone-600 mb-2">
                 {product.category}
               </div>
+
+                <div className="text-sm text-stone-600 mb-2"> Seller Name:
+                {product.agent.fullName}{product.agentId}
+              </div>
               <h1 className="text-3xl lg:text-4xl font-bold text-stone-800">
                 {product.name}
               </h1>
@@ -123,7 +96,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     key={star}
                     type="radio"
                     className="mask mask-star-2 bg-orange-400"
-                    checked={star <= Math.round(product.rating)}
+                    checked={star <= Math.round(product.rating || 0)}
                     readOnly
                   />
                 ))}
@@ -137,11 +110,11 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
             <div className="border-t border-b border-stone-200 py-4">
               <div className="flex items-baseline gap-3">
                 <span className="text-4xl font-bold text-green-600">
-                  ৳{finalPrice.toFixed(2)}
+                  ৳{finalPrice}
                 </span>
                 {product.discount && (
                   <span className="text-xl text-stone-500 line-through">
-                    ৳{product.price.toFixed(2)}
+                    ৳{product.price}
                   </span>
                 )}
                 <span className="text-stone-600">/{product.unit}</span>
@@ -195,36 +168,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
               </p>
             </div>
 
-            {/* Quantity Selector & Add to Cart */}
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-stone-600 mb-2 block">
-                  Quantity ({product.unit})
-                </label>
-                <input
-                  type="number"
-                  min={product.minOrderQuantity}
-                  max={product.maxOrderQuantity || product.stock}
-                  defaultValue={product.minOrderQuantity}
-                  className="input input-bordered w-full max-w-xs"
-                />
-                <div className="text-xs text-stone-500 mt-1">
-                  Min: {product.minOrderQuantity} {product.unit}
-                  {product.maxOrderQuantity && ` | Max: ${product.maxOrderQuantity} ${product.unit}`}
-                </div>
-              </div>
 
-                <button 
-                className="btn btn-lg w-full bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700"
-                disabled={!product.isAvailable}
-                >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {product.isAvailable ? 'Add to Cart' : 'Out of Stock'}
-                </button>
-
-            </div>
           </div>
         </div>
       </div>

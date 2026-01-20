@@ -57,15 +57,15 @@ export default function Register() {
 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
 
 
 
   const handleSubmit = (e: React.FormEvent) => {
+    setLoading(true);
     e.preventDefault();
-    
     try {
       agentRegisterSchema.parse({ fullName, address, email, password, phone, age, nidNumber, experience, bio, nidImage });
       console.log('Form submitted successfully:');
@@ -88,6 +88,7 @@ export default function Register() {
 
 
     const submitData = async () => {
+    
     try {
 
       const formData = new FormData();
@@ -101,17 +102,17 @@ export default function Register() {
       formData.append('bio', bio);
       formData.append('age', age.toString());
 
-    
+     console.log('Submitting form data:', formData);
 
       const response  = await axios.post(process.env.NEXT_PUBLIC_API_URL + '/agent/signup', formData,{headers: {
         'Content-Type': 'application/json'
       }});
 
       setSuccess(true);
+      setLoading(false);
 
 
       
-      console.log('API Response:', response.data );
       setErrors({});
       setFullName('');
       setAddress('');
@@ -129,6 +130,7 @@ export default function Register() {
       
     } catch (error) {
       if (isAxiosError(error)) {
+        setLoading(false);
         setErrors({ apiError: error.response?.data.message });
         console.log('API Error:', error.response );
       } else {
@@ -300,9 +302,10 @@ export default function Register() {
         <div>
           <button
             type="submit"
-            className="mt-5 w-full rounded-md bg-blue-600 p-2 text-center font-semibold text-white hover:bg-blue-700 transition-colors"
+            disabled={loading}
+            className="mt-5 w-full rounded-md bg-blue-600 p-2 text-center font-semibold text-white hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Register as Agent
+            {loading ? 'Signing Up...' : 'Sign Up'}
           </button>
         </div>
       </form>

@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import axios from 'axios';
 import Link from 'next/link';
+import axiosInstance from '@/lib/axios';
 
-// Zod schema for login validation (matching your LoginAgentDto)
 const loginSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
@@ -29,10 +29,8 @@ export default function LoginPage() {
     e.preventDefault();
     
     try {
-      // Validate with Zod
       loginSchema.parse({ email, password });
       
-      // Clear previous errors
       setErrors({});
       setApiError('');
       
@@ -58,49 +56,31 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      const response = await axios.post(process.env.NEXT_PUBLIC_API_URL + '/agent/login', {
+      const response = await axios.post(process.env.NEXT_PUBLIC_API_URL+'/agent/login', {
         email,
         password,
-      });
+      }, { withCredentials: true });
 
       if (response.data.success) {
 
-        if (response.data.access_token) {
-          localStorage.setItem('jwtToken', response.data.access_token);
-          localStorage.setItem('agentId', response.data.agentId);
-        }
-        
-        console.log('Login successful:', response.data);
+        localStorage.setItem('agentId', response.data.agentId);
+        console.log('Login successful');
         setLoading(false);
 
-        
-        // Redirect to dashboard or home
         router.push('/dashboard');
+      }
+
+      if (response.data.success === false) {
+        setApiError(response.data.message || 'Login failed. Please try again.');
+        setLoading(false);
       }
       
     } catch (error) {
+      console.error('Login error:', error);
       setLoading(false);
-      if (axios.isAxiosError(error)) {
-        const axiosError = error;
-        
-        if (axiosError.response) {
-          const errorData = axiosError.response.data;
-          
-          if (errorData.errors && typeof errorData.errors === 'object') {
-            setErrors(errorData.errors);
-          } else {
-            setApiError(errorData.message || 'Invalid email or password');
-          }
-        } else if (axiosError.request) {
-          setApiError('Network error. Please check your connection.');
-        } else {
-          setApiError('An unexpected error occurred.');
-        }
-      } else {
-        setApiError('Login failed. Please try again.');
-      }
+      setApiError('Login failed. Please try again.');
+
       
-      console.error('Login Error:', error);
     } 
   };
 

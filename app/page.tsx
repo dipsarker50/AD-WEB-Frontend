@@ -1,7 +1,11 @@
+
 import Image from "next/image";
 import Link from "next/link";
 
+
+
 export default function Home() {
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -22,12 +26,7 @@ export default function Home() {
               
               {/* CTA Buttons */}
               <div className="flex flex-wrap gap-4 pt-4">
-                <Link
-                  href="/register"
-                  className="px-8 py-3 bg-white text-green-700 rounded-lg font-semibold hover:bg-green-50 transition-colors shadow-lg"
-                >
-                  Become an Agent
-                </Link>
+
                 <Link
                   href="/product"
                   className="px-8 py-3 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors border-2 border-white"
@@ -144,14 +143,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="text-center pt-8">
-                  <Link
-                    href="/register"
-                    className="inline-block px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg"
-                  >
-                    Join as an Agent Today
-                  </Link>
-                </div>
+                
               </div>
             </div>
           </div>
@@ -191,20 +183,7 @@ export default function Home() {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Join thousands of agents and farmers who trust AgriMarket for their agricultural needs
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link
-              href="/register"
-              className="px-8 py-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg text-lg"
-            >
-              Register Now
-            </Link>
-            <Link
-              href="/signin"
-              className="px-8 py-4 bg-white text-green-600 rounded-lg font-semibold hover:bg-gray-50 transition-colors border-2 border-green-600 text-lg"
-            >
-              Sign In
-            </Link>
-          </div>
+          
         </div>
       </section>
     </div>

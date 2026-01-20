@@ -1,121 +1,81 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { AgentInterface } from '@/interfaces/agent';  
+import { ProductInterface } from '@/interfaces/Product';
 import axiosInstance from '@/lib/axios';
+import { verifyAuthSSR } from '@/lib/authSSR';
 
-enum AgentStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive'
-}
-interface AgentProfile {
-  id: number;
-  fullName: string;
-  email: string;
-  phone: string;
-  age: number;
-  address: string;
-  experience?: string;
-  bio?: string;
-  nidNumber: string;
-  status: AgentStatus;
-  isEmailVerified: boolean;
-}
+export default async function DashboardPage() {
+  let agentId: string | null = null ;
+  
+  try {
 
-interface Product {
-  id: number;
-  name: string;
-  price: number;
-  category: string;
-  stock: number;
-  createdAt: string;
-}
+    const authResponse = await verifyAuthSSR();
+    console.log('Auth Response:', authResponse);
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<AgentProfile | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const token = localStorage.getItem('jwtToken');
-    console.log('JWT Token:', token);
-    if (!token) {
-      router.push('/signin');
-      return;
-    }
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-console.log(localStorage.getItem("agentId"));
-      const profileResponse = await axiosInstance.get(`/agent/getagentby?field=id&data=${localStorage.getItem("agentId")}`);
-      console.log('Profile response data:', profileResponse.data);
-      setProfile(profileResponse.data[0]);
-console.log('Profile response:', profile);
-
-
-      const productsResponse = await axiosInstance.get('/agent/agentproducts/'+localStorage.getItem("agentId"));
-          const productsData = productsResponse.data;
     
-    // Check if it's already an array
+    if (!authResponse.authenticated) {
+      redirect('/signin');
+    }
+    
+    agentId = authResponse.agentId;
+  } catch (error) {
+    console.error('Authentication error:', error);
+    redirect('/signin');
+  }
+
+  // Step 2: Fetch profile and products with axios
+  let profile: AgentInterface | null = null;
+  let products: ProductInterface[] = [];
+  let error: string | null = null;
+
+  try {
+    const [profileRes, productsRes] = await Promise.all([
+      axiosInstance.get(`/agent/getagentby?field=id&data=${agentId}`),
+      axiosInstance.get(`/agent/agentproducts/${agentId}`),
+    ]);
+
+    profile = Array.isArray(profileRes.data) ? profileRes.data[0] : profileRes.data;
+
+    const productsData = productsRes.data;
     if (Array.isArray(productsData)) {
-      setProducts(productsData);
-    } 
-    // If it's an object with a 'products' or 'data' property
-    else if (productsData.products && Array.isArray(productsData.products)) {
-      setProducts(productsData.products);
-    } 
-    else if (productsData.data && Array.isArray(productsData.data)) {
-      setProducts(productsData.data);
-      
+      products = productsData;
+    } else if (productsData.products && Array.isArray(productsData.products)) {
+      products = productsData.products;
+    } else if (productsData.data && Array.isArray(productsData.data)) {
+      products = productsData.data;
     }
-     else {
-      setProducts([]);
-      console.log('Products data:', productsData);
-    }
-    } catch (error: any) {
-      setError('Failed to load dashboard data');
-      console.error('Dashboard error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+  } catch (err: any) {
+    error = 'Failed to load dashboard data';
+    console.error('Dashboard error:', err);
   }
 
-  if (error) {
+  if (error || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 text-lg">{error}</p>
-          <button onClick={fetchDashboardData} className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+          <p className="text-red-600 text-lg mb-4">
+            {error || 'Failed to load profile data'}
+          </p>
+          <Link 
+            href="/dashboard"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
             Retry
-          </button>
+          </Link>
         </div>
       </div>
     );
   }
 
+  // Step 4: Render dashboard (same JSX as before)
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
         
         {/* Welcome Header */}
         <div className="bg-gradient-to-r from-green-600 to-green-800 text-white rounded-lg p-8 mb-8">
-          <h1 className="text-3xl font-bold mb-2">Welcome back, {profile?.fullName}! 👋</h1>
+          <h1 className="text-3xl font-bold mb-2">Welcome back, {profile.fullName}! 👋</h1>
           <p className="text-green-100">Manage your products and view your agent dashboard</p>
         </div>
 
@@ -139,7 +99,7 @@ console.log('Profile response:', profile);
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Account Status</p>
-                <p className="text-xl font-bold text-green-600">{profile?.status}</p>
+                <p className="text-xl font-bold text-green-600">{profile.status}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,10 +113,10 @@ console.log('Profile response:', profile);
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Email Status</p>
-                <p className="text-xl font-bold">{profile?.isEmailVerified ? '✓ Verified' : '✗ Not Verified'}</p>
+                <p className="text-xl font-bold">{profile.isEmailVerified ? '✓ Verified' : '✗ Not Verified'}</p>
               </div>
-              <div className={`w-12 h-12 ${profile?.isEmailVerified ? 'bg-green-100' : 'bg-yellow-100'} rounded-full flex items-center justify-center`}>
-                <svg className={`w-6 h-6 ${profile?.isEmailVerified ? 'text-green-600' : 'text-yellow-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={`w-12 h-12 ${profile.isEmailVerified ? 'bg-green-100' : 'bg-yellow-100'} rounded-full flex items-center justify-center`}>
+                <svg className={`w-6 h-6 ${profile.isEmailVerified ? 'text-green-600' : 'text-yellow-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -167,7 +127,7 @@ console.log('Profile response:', profile);
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Experience</p>
-                <p className="text-xl font-bold text-gray-800">{profile?.experience || 'N/A'}</p>
+                <p className="text-xl font-bold text-gray-800">{profile.experience || 'N/A'}</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,21 +147,21 @@ console.log('Profile response:', profile);
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium text-gray-800">{profile?.email}</p>
+                <p className="font-medium text-gray-800">{profile.email}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Phone</p>
-                <p className="font-medium text-gray-800">{profile?.phone}</p>
+                <p className="font-medium text-gray-800">{profile.phone}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Address</p>
-                <p className="font-medium text-gray-800">{profile?.address}</p>
+                <p className="font-medium text-gray-800">{profile.address}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Age</p>
-                <p className="font-medium text-gray-800">{profile?.age} years</p>
+                <p className="font-medium text-gray-800">{profile.age} years</p>
               </div>
-              {profile?.bio && (
+              {profile.bio && (
                 <div>
                   <p className="text-sm text-gray-600">Bio</p>
                   <p className="font-medium text-gray-800">{profile.bio}</p>
@@ -217,7 +177,7 @@ console.log('Profile response:', profile);
           <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">Your Products</h2>
-              <Link href="/my-products/create" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              <Link href="/myproducts/create" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                 + Add Product
               </Link>
             </div>
@@ -228,7 +188,7 @@ console.log('Profile response:', profile);
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
                 <p className="text-gray-600 mb-4">No products yet</p>
-                <Link href="/my-products/create" className="inline-block px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                <Link href="/myproducts/create" className="inline-block px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                   Create Your First Product
                 </Link>
               </div>
@@ -245,14 +205,14 @@ console.log('Profile response:', profile);
                           <span className="text-sm text-gray-600">Stock: {product.stock}</span>
                         </div>
                       </div>
-                      <Link href={`/my-products/${product.id}`} className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+                      <Link href={`/product/${product.id}`} className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
                         View
                       </Link>
                     </div>
                   </div>
                 ))}
                 {products.length > 5 && (
-                  <Link href="/my-products" className="block text-center py-3 text-green-600 hover:text-green-700 font-medium">
+                  <Link href="/myproducts" className="block text-center py-3 text-green-600 hover:text-green-700 font-medium">
                     View All Products ({products.length})
                   </Link>
                 )}
@@ -261,11 +221,11 @@ console.log('Profile response:', profile);
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - same as before */}
         <div className="mt-8 bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-6">Quick Actions</h2>
           <div className="grid md:grid-cols-4 gap-4">
-            <Link href="/my-products/create" className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:border-green-600 hover:shadow-md transition-all">
+            <Link href="/myproducts/create" className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:border-green-600 hover:shadow-md transition-all">
               <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -274,7 +234,7 @@ console.log('Profile response:', profile);
               <span className="font-medium text-gray-700">Add Product</span>
             </Link>
 
-            <Link href="/my-products" className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:border-blue-600 hover:shadow-md transition-all">
+            <Link href="/myproducts" className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:border-blue-600 hover:shadow-md transition-all">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
