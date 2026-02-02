@@ -1,24 +1,23 @@
 import axios from 'axios';
 import TokenManager from './tokenManager';
 import CookieConfigManager from './cookieConfig';
+import VercelConfigManager from './vercelConfig';
 import { logAuthEvent } from './authDebugger';
 
-// Get production-ready cookie configuration
-const cookieConfig = CookieConfigManager.getAxiosConfig();
+// Get Vercel-optimized configuration
+const axiosConfig = VercelConfigManager.getAxiosConfig();
 
-const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-    ...cookieConfig.headers
-  },
-  withCredentials: cookieConfig.withCredentials,
-});
+const axiosInstance = axios.create(axiosConfig);
 
-// Log configuration info in development
+// Log configuration info in development and validate environment
 if (process.env.NODE_ENV !== 'production') {
   CookieConfigManager.logConfigInfo();
+  VercelConfigManager.logEnvironmentInfo();
+  
+  const validation = VercelConfigManager.validateEnvironment();
+  if (!validation.isValid) {
+    console.warn('Environment validation failed:', validation.errors);
+  }
 }
 
 // Request interceptor to add Authorization header if token exists

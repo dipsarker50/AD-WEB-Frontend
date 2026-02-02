@@ -13,15 +13,19 @@ interface CookieConfig {
 
 export class CookieConfigManager {
   private static isProduction = process.env.NODE_ENV === 'production';
-  private static isHTTPS = typeof window !== 'undefined' ? window.location.protocol === 'https:' : false;
+  private static isHTTPS = typeof window !== 'undefined' ? window.location.protocol === 'https:' : true; // Default to true for SSR
+  private static isVercel = typeof process !== 'undefined' && process.env.VERCEL === '1';
 
   /**
    * Get production-ready cookie configuration
    */
   static getConfig(): CookieConfig {
+    // For Vercel and production, use stricter settings
+    const isProductionEnvironment = this.isProduction || this.isVercel;
+    
     return {
-      sameSite: this.isProduction ? 'strict' : 'lax',
-      secure: this.isProduction && this.isHTTPS,
+      sameSite: isProductionEnvironment ? 'none' : 'lax', // 'none' required for cross-origin in production
+      secure: isProductionEnvironment ? true : this.isHTTPS, // Always secure in production
       httpOnly: false, // Must be false for client-side access
       path: '/',
       // Domain should be set by backend, not frontend
