@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
 import Notification from "@/components/notification";  // ✅ Add this
+import AuthProvider from "@/components/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,11 +29,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Notification>  {/* ✅ Wrap everything */}
-          <Header />
-          {children}
-          <Footer />
-        </Notification>
+        <AuthProvider>
+          <Notification>  {/* ✅ Wrap everything */}
+            <Header />
+            {children}
+            <Footer />
+          </Notification>
+        </AuthProvider>
       </body>
     </html>
   );

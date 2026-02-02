@@ -1,46 +1,52 @@
 'use client';
 import Link from 'next/link';
 import Image from "next/image";
-import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import {  } from '@/lib/axios';
-import axios from 'axios';
+import { useAuth } from './AuthProvider';
+import axiosInstance from '@/lib/axios';
 
 export default function Header() {
     return <Navbar />;
 }
 
 export const Navbar = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, logout: authLogout, isLoading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); 
-
-
-    useEffect(() => {
-    const agentId = localStorage.getItem('agentId');
-    setIsAuthenticated(!!agentId);
-    
-
-  }, [pathname]);
-
-
-
-
+  const pathname = usePathname();
 
   const handleLogout = async () => {
     try {
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/agent/logout`,
-        {},
-        { withCredentials: true }
-      );
-      localStorage.removeItem('agentId');
-      setIsAuthenticated(false);
-      router.push('/');
+      // Call backend logout endpoint
+      await axiosInstance.post('/agent/logout');
+      console.log('Backend logout successful');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Backend logout error:', error);
+      // Continue with frontend logout even if backend fails
+    } finally {
+      // Always clear frontend auth state
+      authLogout();
+      router.push('/');
     }
   };
+
+  // Show loading state while auth is being determined
+  if (isLoading) {
+    return (
+      <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-8">
+              <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                <Image src="/favicon.ico" alt="Logo" width={32} height={32} />
+                <span className="text-xl font-bold text-gray-800">AgriMarket</span>
+              </Link>
+            </div>
+            <div className="animate-pulse bg-gray-200 h-8 w-32 rounded"></div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
@@ -68,7 +74,6 @@ export const Navbar = () => {
               {/* My Products - Only when authenticated */}
               {isAuthenticated && (
                 <>
-
                 <Link 
                   href="/dashboard" 
                   className="text-gray-700 hover:text-green-600 font-medium transition-colors"
@@ -83,10 +88,7 @@ export const Navbar = () => {
                   My Products
                 </Link>
                 </>
-                
-
               )}
-
             </div>
           </div>
 
@@ -160,12 +162,8 @@ export const Navbar = () => {
               </div>
             )}
           </div>
-
         </div>
-
       </div>
     </nav>
   );
 }
-
-

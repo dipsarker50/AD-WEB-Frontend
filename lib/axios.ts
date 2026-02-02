@@ -1,32 +1,71 @@
 import axios from 'axios';
+import TokenManager from './tokenManager';
+import CookieConfigManager from './cookieConfig';
+import { logAuthEvent } from './authDebugger';
+
+// Get production-ready cookie configuration
+const cookieConfig = CookieConfigManager.getAxiosConfig();
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    ...cookieConfig.headers
   },
-  withCredentials: true,
+  withCredentials: cookieConfig.withCredentials,
 });
+
+// Log configuration info in development
+if (process.env.NODE_ENV !== 'production') {
+  CookieConfigManager.logConfigInfo();
+}
+
+// Request interceptor to add Authorization header if token exists
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const authHeader = TokenManager.getAuthHeader();
+    if (authHeader) {
+      config.headers.Authorization = authHeader;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
+      logAuthEvent.authFailed({ 
+        reason: '401 Unauthorized', 
+        url: error.config?.url 
+      });
+      
+      // Clear stored tokens on 401 Unauthorized
+      TokenManager.clearTokens();
+      
+      // Only redirect if we're on the client side and not already on signin page
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/signin')) {
+        console.log('401 Unauthorized - redirecting to signin');
         window.location.href = '/signin';
       }
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      logAuthEvent.networkError({ 
+        type: 'timeout', 
+        url: error.config?.url 
+      });
+    } else if (error.response?.status >= 500) {
+      logAuthEvent.networkError({ 
+        status: error.response.status, 
+        url: error.config?.url 
+      });
     }
+    
     return Promise.reject(error);
   }
 );
-
-
-
-
-
-
-
-
 
 export default axiosInstance;

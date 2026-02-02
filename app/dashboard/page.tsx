@@ -1,74 +1,110 @@
-import { redirect } from 'next/navigation';
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AgentInterface } from '@/interfaces/agent';  
 import { ProductInterface } from '@/interfaces/Product';
 import axiosInstance from '@/lib/axios';
-import { verifyAuthSSR } from '@/lib/authSSR';
+import { useAuth } from '@/components/AuthProvider';
+import AuthGuard from '@/components/AuthGuard';
 
-export default async function DashboardPage() {
-  let agentId: string | null = null ;
-  
-  try {
+function DashboardContent() {
+  const { agentId, isAuthenticated, isLoading } = useAuth();
+  const [profile, setProfile] = useState<AgentInterface | null>(null);
+  const [products, setProducts] = useState<ProductInterface[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
-    const authResponse = await verifyAuthSSR();
-    console.log('Auth Response:', authResponse);
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!agentId || !isAuthenticated) {
+        console.log('Dashboard - No agentId or not authenticated yet');
+        return;
+      }
 
-    
-    if (!authResponse.authenticated) {
-      redirect('/signin');
+      console.log('Dashboard - Fetching data for agentId:', agentId);
+      setDataLoading(true);
+
+      try {
+        const [profileRes, productsRes] = await Promise.all([
+          axiosInstance.get(`/agent/getagentby?field=id&data=${agentId}`),
+          axiosInstance.get(`/agent/agentproducts/${agentId}`),
+        ]);
+
+        console.log('Dashboard - Profile response:', profileRes.data);
+        console.log('Dashboard - Products response:', productsRes.data);
+
+        setProfile(Array.isArray(profileRes.data) ? profileRes.data[0] : profileRes.data);
+
+        const productsData = productsRes.data;
+        if (Array.isArray(productsData)) {
+          setProducts(productsData);
+        } else if (productsData.products && Array.isArray(productsData.products)) {
+          setProducts(productsData.products);
+        } else if (productsData.data && Array.isArray(productsData.data)) {
+          setProducts(productsData.data);
+        } else {
+          setProducts([]);
+        }
+
+        setError(null);
+      } catch (err: any) {
+        console.error('Dashboard - Error fetching data:', err);
+        setError('Failed to load dashboard data');
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    if (isAuthenticated && agentId) {
+      fetchData();
     }
-    
-    agentId = authResponse.agentId;
-  } catch (error) {
-    console.error('Authentication error:', error);
-    redirect('/signin');
+  }, [agentId, isAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Step 2: Fetch profile and products with axios
-  let profile: AgentInterface | null = null;
-  let products: ProductInterface[] = [];
-  let error: string | null = null;
-
-  try {
-    const [profileRes, productsRes] = await Promise.all([
-      axiosInstance.get(`/agent/getagentby?field=id&data=${agentId}`),
-      axiosInstance.get(`/agent/agentproducts/${agentId}`),
-    ]);
-
-    profile = Array.isArray(profileRes.data) ? profileRes.data[0] : profileRes.data;
-
-    const productsData = productsRes.data;
-    if (Array.isArray(productsData)) {
-      products = productsData;
-    } else if (productsData.products && Array.isArray(productsData.products)) {
-      products = productsData.products;
-    } else if (productsData.data && Array.isArray(productsData.data)) {
-      products = productsData.data;
-    }
-  } catch (err: any) {
-    error = 'Failed to load dashboard data';
-    console.error('Dashboard error:', err);
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
   }
 
   if (error || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
           <p className="text-red-600 text-lg mb-4">
             {error || 'Failed to load profile data'}
           </p>
-          <Link 
-            href="/dashboard"
+          <button 
+            onClick={() => window.location.reload()}
             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             Retry
-          </Link>
+          </button>
         </div>
       </div>
     );
   }
 
-  // Step 4: Render dashboard (same JSX as before)
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
@@ -221,7 +257,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Actions - same as before */}
+        {/* Quick Actions */}
         <div className="mt-8 bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-6">Quick Actions</h2>
           <div className="grid md:grid-cols-4 gap-4">
@@ -265,5 +301,13 @@ export default async function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGuard>
+      <DashboardContent />
+    </AuthGuard>
   );
 }

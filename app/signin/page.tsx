@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
-import axios from 'axios';
 import Link from 'next/link';
 import axiosInstance from '@/lib/axios';
+import { useAuth } from '@/components/AuthProvider';
+import TokenManager from '@/lib/tokenManager';
 
 const loginSchema = z.object({
   email: z.string()
@@ -18,6 +19,7 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,31 +58,95 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      const response = await axios.post(process.env.NEXT_PUBLIC_API_URL+'/agent/login', {
+      console.log('Attempting login with:', { email, password: '[HIDDEN]' });
+      
+      const response = await axiosInstance.post('/agent/login', {
         email,
         password,
-      }, { withCredentials: true });
+      });
+
+      console.log('Login response received:', {
+        status: response.status,
+        data: response.data,
+        headers: response.headers
+      });
 
       if (response.data.success) {
+        // Try different possible response structures
+        let token = response.data.token || response.data.accessToken || response.data.access_token;
+        let agentId = response.data.agentId || response.data.agent_id || response.data.userId || response.data.user_id || response.data.id;
+        let expiresIn = response.data.expiresIn || response.data.expires_in || response.data.expiry;
+        
+        console.log('Extracted login data:', { 
+          token: token ? `${token.substring(0, 20)}...` : 'NOT FOUND', 
+          agentId, 
+          expiresIn 
+        });
+        
+        // Validate required data
+        if (!token || !agentId) {
+          console.error('Missing required login data:', { hasToken: !!token, hasAgentId: !!agentId });
+          console.error('Full response data keys:', Object.keys(response.data));
+          setApiError(`Invalid response from server. Missing ${!token ? 'token' : 'agentId'}. Please try again.`);
+          setLoading(false);
+          return;
+        }
 
-        localStorage.setItem('agentId', response.data.agentId);
-        console.log('Login successful');
+        // Validate token format
+        if (!TokenManager.isValidTokenFormat(token)) {
+          console.error('Invalid token format:', token);
+          setApiError('Invalid token received. Please contact support.');
+          setLoading(false);
+          return;
+        }
+
+        // Calculate expiry time if provided
+        let expiresAt: number | undefined;
+        if (expiresIn) {
+          expiresAt = Date.now() + (expiresIn * 1000); // Convert seconds to milliseconds
+        }
+
+        // Use AuthProvider's login method which handles TokenManager
+        console.log('Calling login with processed data:', { agentId, hasExpiry: !!expiresAt });
+        login(token, agentId, expiresAt);
+        
+        console.log('Login successful - tokens stored and auth state updated');
         setLoading(false);
-
-        router.push('/dashboard');
-      }
-
-      if (response.data.success === false) {
+        
+        // Small delay to ensure auth state is updated
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 100);
+      } else {
+        console.error('Login failed - success is false:', response.data);
         setApiError(response.data.message || 'Login failed. Please try again.');
         setLoading(false);
       }
       
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
+      console.error('Login error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL
+        }
+      });
       setLoading(false);
-      setApiError('Login failed. Please try again.');
-
       
+      // More specific error handling
+      if (error.response?.status === 401) {
+        setApiError('Invalid email or password.');
+      } else if (error.response?.status === 429) {
+        setApiError('Too many login attempts. Please try again later.');
+      } else if (error.response?.data?.message) {
+        setApiError(error.response.data.message);
+      } else {
+        setApiError('Login failed. Please check your connection and try again.');
+      }
     } 
   };
 
