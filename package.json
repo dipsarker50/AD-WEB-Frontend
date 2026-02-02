@@ -11,7 +11,7 @@
     "axios": "^1.13.2",
     "babel-plugin-react-compiler": "^1.0.0",
     "daisyui": "^5.5.14",
-    "next": "16.1.0",
+    "next": "^16.1.6",
     "pusher-js": "^8.4.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

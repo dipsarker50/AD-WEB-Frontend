@@ -45,7 +45,7 @@ export default function LoginPage() {
         const newErrors: Record<string, string> = {};
         
         for (const [key, messages] of Object.entries(fieldErrors)) {
-          if (messages && messages[0]) {
+          if (messages && Array.isArray(messages) && messages[0]) {
             newErrors[key] = messages[0];
           }
         }
