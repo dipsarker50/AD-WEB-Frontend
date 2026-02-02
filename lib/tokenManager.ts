@@ -10,6 +10,9 @@ export class TokenManager {
   private static readonly ACCESS_TOKEN_KEY = 'access_token';
   private static readonly AGENT_ID_KEY = 'agentId';
   private static readonly TOKEN_EXPIRY_KEY = 'token_expires_at';
+  
+  // In-memory fallback for production environments with localStorage issues
+  private static memoryStore: Record<string, string> = {};
 
   /**
    * Check if we're running on the client side
@@ -19,17 +22,77 @@ export class TokenManager {
   }
 
   /**
+   * Set item with fallback to memory storage
+   */
+  private static setItem(key: string, value: string): void {
+    if (!this.isClient()) return;
+
+    try {
+      localStorage.setItem(key, value);
+      // Also store in memory as backup
+      this.memoryStore[key] = value;
+      console.log(`TokenManager: Stored ${key} in both localStorage and memory`);
+    } catch (error) {
+      console.warn(`TokenManager: localStorage failed for ${key}, using memory storage:`, error);
+      this.memoryStore[key] = value;
+    }
+  }
+
+  /**
+   * Get item with fallback to memory storage
+   */
+  private static getItem(key: string): string | null {
+    if (!this.isClient()) return null;
+
+    try {
+      const value = localStorage.getItem(key);
+      if (value) {
+        console.log(`TokenManager: Retrieved ${key} from localStorage`);
+        return value;
+      }
+      
+      // Fallback to memory storage
+      const memoryValue = this.memoryStore[key];
+      if (memoryValue) {
+        console.log(`TokenManager: Retrieved ${key} from memory storage`);
+        return memoryValue;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn(`TokenManager: localStorage access failed for ${key}, checking memory:`, error);
+      return this.memoryStore[key] || null;
+    }
+  }
+
+  /**
+   * Remove item from both storages
+   */
+  private static removeItem(key: string): void {
+    if (!this.isClient()) return;
+
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn(`TokenManager: localStorage removal failed for ${key}:`, error);
+    }
+    
+    delete this.memoryStore[key];
+    console.log(`TokenManager: Removed ${key} from both storages`);
+  }
+
+  /**
    * Store authentication tokens
    */
   static setTokens(tokenData: TokenData): void {
     if (!this.isClient()) return;
 
     try {
-      localStorage.setItem(this.ACCESS_TOKEN_KEY, tokenData.access_token);
-      localStorage.setItem(this.AGENT_ID_KEY, tokenData.agentId);
+      this.setItem(this.ACCESS_TOKEN_KEY, tokenData.access_token);
+      this.setItem(this.AGENT_ID_KEY, tokenData.agentId);
       
       if (tokenData.expiresAt) {
-        localStorage.setItem(this.TOKEN_EXPIRY_KEY, tokenData.expiresAt.toString());
+        this.setItem(this.TOKEN_EXPIRY_KEY, tokenData.expiresAt.toString());
       }
       
       logAuthEvent.tokenStore({ agentId: tokenData.agentId, hasExpiry: !!tokenData.expiresAt });
@@ -47,17 +110,28 @@ export class TokenManager {
     if (!this.isClient()) return null;
 
     try {
-      const token = localStorage.getItem(this.ACCESS_TOKEN_KEY);
+      const token = this.getItem(this.ACCESS_TOKEN_KEY);
+      
+      // Debug logging for Vercel
+      console.log('TokenManager: Getting access token', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        isClient: this.isClient()
+      });
       
       // Check if token is expired
       if (token && this.isTokenExpired()) {
         logAuthEvent.tokenExpired();
+        console.log('TokenManager: Token expired, clearing tokens');
         this.clearTokens();
         return null;
       }
       
       if (token) {
         logAuthEvent.tokenRetrieve({ hasToken: true });
+        console.log('TokenManager: Token retrieved successfully');
+      } else {
+        console.log('TokenManager: No token found in storage');
       }
       
       return token;
@@ -75,7 +149,7 @@ export class TokenManager {
     if (!this.isClient()) return null;
 
     try {
-      return localStorage.getItem(this.AGENT_ID_KEY);
+      return this.getItem(this.AGENT_ID_KEY);
     } catch (error) {
       console.error('Error getting agent ID:', error);
       return null;
@@ -96,7 +170,7 @@ export class TokenManager {
     if (!this.isClient()) return false;
 
     try {
-      const expiryTime = localStorage.getItem(this.TOKEN_EXPIRY_KEY);
+      const expiryTime = this.getItem(this.TOKEN_EXPIRY_KEY);
       if (!expiryTime) return false;
 
       const now = Date.now();
@@ -116,9 +190,9 @@ export class TokenManager {
     if (!this.isClient()) return;
 
     try {
-      localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-      localStorage.removeItem(this.AGENT_ID_KEY);
-      localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
+      this.removeItem(this.ACCESS_TOKEN_KEY);
+      this.removeItem(this.AGENT_ID_KEY);
+      this.removeItem(this.TOKEN_EXPIRY_KEY);
       
       logAuthEvent.tokenClear();
       console.log('Tokens cleared successfully');
@@ -168,7 +242,7 @@ export class TokenManager {
     if (!this.isClient()) return undefined;
 
     try {
-      const expiryTime = localStorage.getItem(this.TOKEN_EXPIRY_KEY);
+      const expiryTime = this.getItem(this.TOKEN_EXPIRY_KEY);
       return expiryTime ? parseInt(expiryTime, 10) : undefined;
     } catch (error) {
       console.error('Error getting token expiry:', error);

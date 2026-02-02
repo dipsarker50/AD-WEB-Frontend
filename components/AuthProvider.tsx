@@ -42,8 +42,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       expiresAt
     });
     
+    // Set state immediately to prevent race conditions
     setIsAuthenticated(true);
     setAgentId(agentId);
+    
+    // Verify storage after a short delay to ensure tokens persisted
+    setTimeout(() => {
+      const storedToken = TokenManager.getAccessToken();
+      const storedAgentId = TokenManager.getAgentId();
+      
+      console.log('AuthProvider: Post-login verification', {
+        hasToken: !!storedToken,
+        hasAgentId: !!storedAgentId,
+        tokenMatches: storedToken === token,
+        agentIdMatches: storedAgentId === agentId
+      });
+      
+      if (!storedToken || !storedAgentId) {
+        console.error('AuthProvider: Token storage failed, retrying...');
+        // Retry storage once
+        TokenManager.setTokens({
+          access_token: token,
+          agentId,
+          expiresAt
+        });
+      }
+    }, 50);
   };
 
   const logout = () => {
@@ -125,16 +149,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Listen for storage changes (when user logs in/out in another tab)
   useEffect(() => {
+    let debounceTimer: NodeJS.Timeout;
+    
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'access_token' || e.key === 'agentId') {
-        console.log('AuthProvider: Storage changed for key:', e.key, 'New value:', e.newValue ? '[PRESENT]' : '[REMOVED]');
-        checkAuth();
+        console.log('AuthProvider: Storage changed for key:', e.key, 'New value:', e.newValue ? '[REMOVED]' : '[REMOVED]');
+        
+        // Clear previous timer
+        clearTimeout(debounceTimer);
+        
+        // Debounce the auth check to avoid rapid successive calls
+        debounceTimer = setTimeout(() => {
+          console.log('AuthProvider: Debounced storage change check');
+          checkAuth();
+        }, 100);
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
+      clearTimeout(debounceTimer);
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
